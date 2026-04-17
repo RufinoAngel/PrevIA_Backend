@@ -1,0 +1,14 @@
+# Dependencias de Node
+node_modules/
+
+# Archivos de entorno (¡Súper importante para tu seguridad!)
+.env
+
+# Archivos de logs (errores de npm)
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos del sistema operativo (Mac/Windows)
+.DS_Store
+Thumbs.db
