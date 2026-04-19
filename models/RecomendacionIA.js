@@ -11,6 +11,11 @@ const recomendacionIASchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  momento_dia: {
+    type: String, // Ej: "Desayuno", "Comida", "Cena"
+    enum: ['Desayuno', 'Comida', 'Cena'],
+    default: null
+  },
   tipo_recomendacion: {
     type: String, // Ej: "mini-reto", "consejo", "alerta"
     required: true

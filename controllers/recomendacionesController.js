@@ -29,101 +29,125 @@ const generarRecomendacionIA = async (req, res) => {
     const nombreUsuario = perfilDb.length > 0 && perfilDb[0].nombre ? perfilDb[0].nombre : 'Usuario';
     const metaAgua = perfilDb.length > 0 && perfilDb[0].meta_agua_vasos ? perfilDb[0].meta_agua_vasos : 8;
 
-    // B. Definir los límites del día de HOY (¡EN HORA LOCAL, NO UTC!)
+    // B. Definir los límites del día de HOY (¡EN UTC, IGUAL QUE LOS REGISTROS!)
     const inicioDia = new Date();
-    inicioDia.setHours(0, 0, 0, 0); // Cambiamos setUTCHours por setHours
+    inicioDia.setUTCHours(0, 0, 0, 0);
     const finDia = new Date();
-    finDia.setHours(23, 59, 59, 999); // Cambiamos setUTCHours por setHours
+    finDia.setUTCHours(23, 59, 59, 999);
     
     // CACHÉ DEL BACKEND: ¿Ya le dimos consejo hoy a este usuario?
-    const recomendacionExistente = await RecomendacionIA.findOne({
+    const recomendacionesExistentes = await RecomendacionIA.find({
       usuario_id: usuarioId,
       fecha_generacion: { $gte: inicioDia, $lte: finDia }
     });
 
-    if (recomendacionExistente) {
-      return res.status(200).json({ datos: recomendacionExistente });
+    if (recomendacionesExistentes.length > 0) {
+      return res.status(200).json({ datos: recomendacionesExistentes });
     }
 
     // C. EL GUARDIA DE SEGURIDAD
-    const [bienestarHoy, suenoHoy, alimentacionHoy, actividadHoy] = await Promise.all([
+    const [bienestarHoy, suenoHoy, alimentacionesHoy, actividadHoy] = await Promise.all([
       RegistroBienestar.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 }),
       RegistroSueno.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 }),
-      RegistroAlimentacion.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 }),
+      RegistroAlimentacion.find({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ hora_registro: 1 }),
       RegistroActividadFisica.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 })
     ]);
 
     // 🔥 EL CHISMOSO: Esto imprimirá en tu terminal qué registros SÍ encontró y cuáles NO
-    console.log(`[IA DEBUG] Registros encontrados -> Bienestar: ${!!bienestarHoy} | Sueño: ${!!suenoHoy} | Nutrición: ${!!alimentacionHoy} | Actividad: ${!!actividadHoy}`);
+    console.log(`[IA DEBUG] Registros encontrados -> Bienestar: ${!!bienestarHoy} | Sueño: ${!!suenoHoy} | Comidas: ${alimentacionesHoy.length} | Actividad: ${!!actividadHoy}`);
 
     // Si falta AUNQUE SEA UNO, bloqueamos a la IA y le avisamos al Frontend
-    if (!bienestarHoy || !suenoHoy || !alimentacionHoy || !actividadHoy) {
+    if (!bienestarHoy || !suenoHoy || alimentacionesHoy.length === 0 || !actividadHoy) {
       return res.status(400).json({ 
         registros_completos: false,
         error: 'Para darte un consejo exacto, necesito que completes tus 4 registros de hoy (Agua/Ánimo, Sueño, Nutrición y Ejercicio).' 
       });
     }
 
-    // D. Armar el Súper-Prompt
-    const prompt = `
-      Eres el coach de bienestar oficial de la app PrevIA.
-      Tu usuario se llama ${nombreUsuario}.
+    // Agrupar comidas por tipo
+    const comidasPorTipo = {
+      Desayuno: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'desayuno'),
+      Comida: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'comida'),
+      Cena: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'cena')
+    };
+
+    // Generar 3 prompts - uno para cada momento del día
+    const momentosDia = ['Desayuno', 'Comida', 'Cena'];
+    const recomendacionesGuardadas = [];
+
+    for (const momento of momentosDia) {
+      const comidaMomento = comidasPorTipo[momento];
       
-      Análisis de su día de hoy:
-      - Bienestar: Estrés ${bienestarHoy.nivel_estres || 3}/5, Ánimo "${bienestarHoy.estado_animo || 'Normal'}", Agua: ${bienestarHoy.vasos_agua_consumidos || 0}/${metaAgua} vasos.
-      - Sueño: Durmió ${suenoHoy.horas_dormidas || 0} horas (Calidad reportada: ${suenoHoy.calidad || 3}/5).
-      - Nutrición: Comió "${alimentacionHoy.descripcion_corta || 'No especificado'}".
-      - Actividad Física: Hizo ${actividadHoy.duracion_minutos || 0} minutos de ${actividadHoy.tipo_ejercicio || 'ejercicio'} a intensidad ${actividadHoy.intensidad || 'Media'}.
-      
-      Instrucciones:
-      Con base en estos datos, decide qué necesita más el usuario hoy.
-      - Si está descuidando un área, dale una "Recomendación" específica para corregirlo.
-      - Si va bien pero puede mejorar, dale una "Sugerencia".
-      - Si todo está excelente, dale un "Reto" extra para motivarlo.
-      
-      Responde ESTRICTAMENTE en formato JSON válido, sin usar comillas invertidas extra ni la palabra json, con la siguiente estructura exacta:
-      {
-        "tipo": "Recomendación",
-        "mensaje": "El mensaje directo de máximo 3 oraciones. Sin saludar."
+      if (!comidaMomento) continue; // Si no hay registro para este momento, saltar
+
+      const prompt = `
+        Eres el coach de bienestar oficial de la app PrevIA.
+        Tu usuario se llama ${nombreUsuario}.
+        
+        El usuario acaba de registrar su ${momento.toLowerCase()} de hoy.
+        
+        Análisis de este momento:
+        - ${momento}: "${comidaMomento.descripcion_corta || 'No especificado'}"
+        - Contexto general: Estrés ${bienestarHoy.nivel_estres || 3}/5, Ánimo "${bienestarHoy.estado_animo || 'Normal'}", Agua: ${bienestarHoy.vasos_agua_consumidos || 0}/${metaAgua} vasos.
+        - Sueño anoche: ${suenoHoy.horas_dormidas || 0} horas (Calidad: ${suenoHoy.calidad || 3}/5).
+        - Actividad física: ${actividadHoy.duracion_minutos || 0} minutos de ${actividadHoy.tipo_ejercicio || 'ejercicio'}.
+        
+        Instrucciones:
+        Dale un consejo específico para este ${momento.toLowerCase()} que considerando su estado general.
+        - Si la comida es poco nutritiva, sugiere mejoras.
+        - Si es buena opción, motívalo a mantenerlo.
+        - Si puede complementar con algo (agua, proteína, etc.), recomiéndalo.
+        
+        Responde ESTRICTAMENTE en formato JSON válido, sin comillas invertidas ni la palabra json, con esta estructura:
+        {
+          "tipo": "Recomendación",
+          "mensaje": "Consejo específico de máximo 2 oraciones para este ${momento}. Sin saludar."
+        }
+      `;
+
+      try {
+        console.log(`[IA DEBUG] Generando recomendación para ${momento}...`);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const result = await model.generateContent(prompt);
+        let respuestaIA = result.response.text();
+        console.log(`[IA DEBUG] Respuesta de Gemini para ${momento}:`, respuestaIA);
+
+        respuestaIA = respuestaIA.replace(/```json/gi, '').replace(/```/g, '').trim();
+
+        let tipoRecomendacion = 'Sugerencia';
+        let mensajeRecomendacion = `Buen ${momento.toLowerCase()}.`;
+
+        try {
+          const dataProcesada = JSON.parse(respuestaIA);
+          tipoRecomendacion = dataProcesada.tipo || 'Sugerencia';
+          mensajeRecomendacion = dataProcesada.mensaje || respuestaIA;
+        } catch (e) {
+          console.warn(`Gemini no devolvió JSON para ${momento}. Usando texto plano.`);
+          mensajeRecomendacion = respuestaIA;
+        }
+
+        // Guardar la recomendación
+        const nuevaRecomendacion = new RecomendacionIA({
+          usuario_id: usuarioId,
+          fecha_generacion: new Date(),
+          momento_dia: momento,
+          tipo_recomendacion: tipoRecomendacion,
+          mensaje_texto: mensajeRecomendacion,
+          estado_completado: false
+        });
+
+        const recomendacionGuardada = await nuevaRecomendacion.save();
+        recomendacionesGuardadas.push(recomendacionGuardada);
+
+      } catch (error) {
+        console.error(`Error generando recomendación para ${momento}:`, error);
       }
-    `;
-
-    // E. Llamar a Gemini
-    console.log('[IA DEBUG] Llamando a Gemini API...');
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const result = await model.generateContent(prompt);
-    let respuestaIA = result.response.text();
-    console.log('[IA DEBUG] Respuesta cruda de Gemini:', respuestaIA);
-
-    respuestaIA = respuestaIA.replace(/```json/gi, '').replace(/```/g, '').trim();
-
-    let tipoRecomendacion = 'Sugerencia';
-    let mensajeRecomendacion = 'Continúa con tus buenos hábitos.';
-
-    try {
-      const dataProcesada = JSON.parse(respuestaIA);
-      tipoRecomendacion = dataProcesada.tipo || 'Sugerencia';
-      mensajeRecomendacion = dataProcesada.mensaje || respuestaIA;
-    } catch (e) {
-      console.warn('Gemini no devolvió un JSON estricto. Se usará el texto plano.');
-      mensajeRecomendacion = respuestaIA;
     }
-
-    // F. Guardar la creación en MongoDB
-    const nuevaRecomendacion = new RecomendacionIA({
-      usuario_id: usuarioId,
-      fecha_generacion: new Date(),
-      tipo_recomendacion: tipoRecomendacion, 
-      mensaje_texto: mensajeRecomendacion,
-      estado_completado: false
-    });
-
-    const recomendacionGuardada = await nuevaRecomendacion.save();
 
     res.status(201).json({
       registros_completos: true,
-      mensaje: 'PrevIA ha analizado tu día y tiene algo para ti',
-      datos: recomendacionGuardada
+      mensaje: 'PrevIA ha analizado tu día y tiene consejos para cada momento',
+      datos: recomendacionesGuardadas
     });
 
   } catch (error) {
