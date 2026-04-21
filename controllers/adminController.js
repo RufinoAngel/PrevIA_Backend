@@ -1,6 +1,4 @@
 const pool = require('../config/db');
-
-// Listar todos los usuarios para el panel de control
 const obtenerUsuarios = async (req, res) => {
   try {
     const query = `
@@ -23,17 +21,12 @@ const obtenerUsuarios = async (req, res) => {
   }
 };
 
-// Cambiar el rol de un usuario específico
 const cambiarRol = async (req, res) => {
   const { id } = req.params;
-  const { nuevoRol } = req.body; // 'admin' o 'usuario'
-
-  // Validar roles permitidos
+  const { nuevoRol } = req.body; 
   if (!['admin_previa', 'usuario_previa'].includes(nuevoRol)) {
     return res.status(400).json({ error: 'Rol no válido' });
   }
-
-  // Prevención: El admin no puede degradarse a sí mismo
   if (parseInt(id) === req.usuario.id && nuevoRol !== 'admin_previa') {
     return res.status(400).json({ error: 'No puedes quitarte los permisos de admin a ti mismo.' });
   }

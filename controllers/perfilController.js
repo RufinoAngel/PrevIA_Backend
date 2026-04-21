@@ -2,13 +2,13 @@
 
 const pool = require('../config/db');
 
-// 1. OBTENER PERFIL Y METAS DEL USUARIO
-// OBTENER EL PERFIL DEL USUARIO
+
+
 const obtenerPerfil = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
 
-    // LA NUEVA SÚPER CONSULTA
+    
     const query = `
       SELECT 
         p.nombre, 
@@ -29,7 +29,7 @@ const obtenerPerfil = async (req, res) => {
       return res.status(404).json({ error: 'Perfil no encontrado' });
     }
 
-    // Le devolvemos el primer (y único) resultado a React
+    
     res.status(200).json(resultados[0]);
 
   } catch (error) {
@@ -37,7 +37,7 @@ const obtenerPerfil = async (req, res) => {
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
-// 2. CREAR O ACTUALIZAR PERFIL Y METAS (Upsert)
+
 const actualizarPerfil = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -45,12 +45,12 @@ const actualizarPerfil = async (req, res) => {
       nombre, fechaNacimiento, peso, altura, genero
     } = req.body;
 
-    // Validación básica
+    
     if (!nombre) {
       return res.status(400).json({ error: 'El nombre es obligatorio' });
     }
 
-    // Insertar o actualizar Perfil
+    
     const queryPerfil = `
       INSERT INTO perfiles (usuario_id, nombre, fecha_nacimiento, peso, altura, genero)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -71,9 +71,9 @@ const actualizarPerfil = async (req, res) => {
 };
 const obtenerConfiguracion = async (req, res) => {
   try {
-    const usuarioId = req.usuario.id; // Extraído del token JWT
+    const usuarioId = req.usuario.id; 
 
-    // Consulta a MySQL (Asegúrate de que estas columnas existan en tu tabla)
+    
     const [rows] = await pool.query(
       `SELECT notificaciones_recordatorios, notificaciones_resumen, 
                     perfil_publico, compartir_datos, sistema_unidades
@@ -92,7 +92,7 @@ const obtenerConfiguracion = async (req, res) => {
   }
 };
 
-// 2. ACTUALIZAR LAS CONFIGURACIONES Y METAS
+
 const actualizarConfiguracion = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -104,7 +104,7 @@ const actualizarConfiguracion = async (req, res) => {
       sistema_unidades
     } = req.body;
 
-    // Actualización en MySQL
+    
     const [result] = await pool.query(
       `UPDATE usuarios SET 
                 notificaciones_recordatorios = ?, 

@@ -2,7 +2,7 @@
 
 const pool = require('../config/db');
 
-// 1. OTORGAR UNA MEDALLA AL USUARIO
+
 const otorgarMedalla = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -29,7 +29,7 @@ const otorgarMedalla = async (req, res) => {
   }
 };
 
-// 2. OBTENER LA VITRINA DE MEDALLAS DEL USUARIO
+
 const obtenerMedallasUsuario = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;

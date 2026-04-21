@@ -2,7 +2,7 @@
 
 const RegistroSueno = require('../models/RegistroSueno');
 
-// 1. CREAR REGISTRO DE SUEÑO
+
 const crearRegistroSueno = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -39,7 +39,7 @@ const crearRegistroSueno = async (req, res) => {
   }
 };
 
-// 2. OBTENER HISTORIAL DE SUEÑO DEL USUARIO
+
 const obtenerHistorialSueno = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -54,7 +54,7 @@ const obtenerHistorialSueno = async (req, res) => {
   }
 };
 
-// 3. OBTENER REGISTRO DE UN DÍA ESPECÍFICO
+
 const obtenerSuenoPorFecha = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -79,7 +79,7 @@ const obtenerSuenoPorFecha = async (req, res) => {
   }
 };
 
-// 4. ACTUALIZAR REGISTRO DE SUEÑO
+
 const actualizarRegistroSueno = async (req, res) => {
   try {
     const { id } = req.params;

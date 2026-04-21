@@ -5,9 +5,9 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const nodemailer = require('nodemailer');
 
-// -----------------------------------------------------
-// CONFIGURACIÓN DEL CORREO (Nodemailer + Mailtrap)
-// -----------------------------------------------------
+
+
+
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
   port: process.env.EMAIL_PORT,
@@ -106,7 +106,7 @@ const resetearPassword = async (req, res) => {
   }
 };
 
-// 1. REGISTRAR USUARIO
+
 const registrarUsuario = async (req, res) => {
   try {
     const { email, password, authProvider = 'local', aceptaIa = true, rol = 'usuario_previa' } = req.body;
@@ -144,7 +144,7 @@ const registrarUsuario = async (req, res) => {
   }
 };
 
-// 2. INICIAR SESIÓN (LOGIN)
+
 const loginUsuario = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -169,7 +169,7 @@ const loginUsuario = async (req, res) => {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    // El token ahora viaja con el rol incrustado para validar permisos después
+    
     const token = jwt.sign(
       { id: usuario.id_usuario, email: usuario.email, rol: usuario.rol },
       process.env.JWT_SECRET,
@@ -191,7 +191,7 @@ const loginUsuario = async (req, res) => {
   }
 };
 
-// 3. OBTENER TODOS LOS USUARIOS (Ideal para el dashboard del admin_previa)
+
 const obtenerUsuarios = async (req, res) => {
   try {
     const [usuarios] = await pool.query(
@@ -204,7 +204,7 @@ const obtenerUsuarios = async (req, res) => {
   }
 };
 
-// 4. ELIMINAR USUARIO (ON DELETE CASCADE borrará todo su rastro en MySQL)
+
 const eliminarUsuario = async (req, res) => {
   try {
     const { id } = req.params;

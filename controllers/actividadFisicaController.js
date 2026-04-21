@@ -1,8 +1,6 @@
 'use strict';
 
 const RegistroActividadFisica = require('../models/RegistroActividadFisica');
-
-// 1. CREAR REGISTRO DE ACTIVIDAD FÍSICA
 const crearRegistroActividad = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -34,14 +32,12 @@ const crearRegistroActividad = async (req, res) => {
     res.status(500).json({ error: 'Error interno al registrar la actividad física' });
   }
 };
-
-// 2. OBTENER EL HISTORIAL COMPLETO
 const obtenerHistorialActividad = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
     
     const historial = await RegistroActividadFisica.find({ usuario_id: usuarioId })
-      .sort({ fecha: -1, createdAt: -1 }); // Los más recientes primero
+      .sort({ fecha: -1, createdAt: -1 }); 
 
     res.status(200).json(historial);
   } catch (error) {
@@ -50,7 +46,6 @@ const obtenerHistorialActividad = async (req, res) => {
   }
 };
 
-// 3. OBTENER LAS ACTIVIDADES DE UN DÍA ESPECÍFICO
 const obtenerActividadPorFecha = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
@@ -71,7 +66,6 @@ const obtenerActividadPorFecha = async (req, res) => {
   }
 };
 
-// 4. ACTUALIZAR UN REGISTRO
 const actualizarRegistroActividad = async (req, res) => {
   try {
     const { id } = req.params;

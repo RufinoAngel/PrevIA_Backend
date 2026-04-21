@@ -12,27 +12,27 @@ const recomendacionIASchema = new mongoose.Schema({
     required: true
   },
   momento_dia: {
-    type: String, // Ej: "Desayuno", "Comida", "Cena"
+    type: String, 
     enum: ['Desayuno', 'Comida', 'Cena'],
     default: null
   },
   tipo_recomendacion: {
-    type: String, // Ej: "mini-reto", "consejo", "alerta"
+    type: String, 
     required: true
   },
   mensaje_texto: {
-    type: String, // El mensaje generado por la IA
+    type: String, 
     required: true
   },
   estado_completado: {
     type: Boolean,
-    default: false // Todo reto nace sin completar
+    default: false 
   }
 }, {
   timestamps: true
 });
 
-// Índice para buscar rápido las recomendaciones de un usuario, de la más nueva a la más vieja
+
 recomendacionIASchema.index({ usuario_id: 1, fecha_generacion: -1 });
 
 module.exports = mongoose.model('RecomendacionIA', recomendacionIASchema);

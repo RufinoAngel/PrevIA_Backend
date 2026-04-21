@@ -10,14 +10,14 @@ const pool = require('../config/db');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 1. GENERAR UNA RECOMENDACIÓN CON INTELIGENCIA ARTIFICIAL
-// 1. GENERAR UNA RECOMENDACIÓN CON INTELIGENCIA ARTIFICIAL
+
+
 const generarRecomendacionIA = async (req, res) => {
   try {
     console.log('👉 ¡HOLA! El frontend sí me llamó para generar la IA');
     const usuarioId = req.usuario.id;
 
-    // A. Consultar MySQL: Obtener el nombre y metas
+    
     const [perfilDb] = await pool.query(
       `SELECT p.nombre, m.meta_agua_vasos 
        FROM perfiles p 
@@ -29,13 +29,13 @@ const generarRecomendacionIA = async (req, res) => {
     const nombreUsuario = perfilDb.length > 0 && perfilDb[0].nombre ? perfilDb[0].nombre : 'Usuario';
     const metaAgua = perfilDb.length > 0 && perfilDb[0].meta_agua_vasos ? perfilDb[0].meta_agua_vasos : 8;
 
-    // B. Definir los límites del día de HOY (¡EN UTC, IGUAL QUE LOS REGISTROS!)
+    
     const inicioDia = new Date();
     inicioDia.setUTCHours(0, 0, 0, 0);
     const finDia = new Date();
     finDia.setUTCHours(23, 59, 59, 999);
     
-    // CACHÉ DEL BACKEND: ¿Ya le dimos consejo hoy a este usuario?
+    
     const recomendacionesExistentes = await RecomendacionIA.find({
       usuario_id: usuarioId,
       fecha_generacion: { $gte: inicioDia, $lte: finDia }
@@ -45,7 +45,7 @@ const generarRecomendacionIA = async (req, res) => {
       return res.status(200).json({ datos: recomendacionesExistentes });
     }
 
-    // C. EL GUARDIA DE SEGURIDAD
+    
     const [bienestarHoy, suenoHoy, alimentacionesHoy, actividadHoy] = await Promise.all([
       RegistroBienestar.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 }),
       RegistroSueno.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 }),
@@ -53,10 +53,10 @@ const generarRecomendacionIA = async (req, res) => {
       RegistroActividadFisica.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 })
     ]);
 
-    // 🔥 EL CHISMOSO: Esto imprimirá en tu terminal qué registros SÍ encontró y cuáles NO
+    
     console.log(`[IA DEBUG] Registros encontrados -> Bienestar: ${!!bienestarHoy} | Sueño: ${!!suenoHoy} | Comidas: ${alimentacionesHoy.length} | Actividad: ${!!actividadHoy}`);
 
-    // Si falta AUNQUE SEA UNO, bloqueamos a la IA y le avisamos al Frontend
+    
     if (!bienestarHoy || !suenoHoy || alimentacionesHoy.length === 0 || !actividadHoy) {
       return res.status(400).json({ 
         registros_completos: false,
@@ -64,21 +64,21 @@ const generarRecomendacionIA = async (req, res) => {
       });
     }
 
-    // Agrupar comidas por tipo
+    
     const comidasPorTipo = {
       Desayuno: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'desayuno'),
       Comida: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'comida'),
       Cena: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'cena')
     };
 
-    // Generar 3 prompts - uno para cada momento del día
+    
     const momentosDia = ['Desayuno', 'Comida', 'Cena'];
     const recomendacionesGuardadas = [];
 
     for (const momento of momentosDia) {
       const comidaMomento = comidasPorTipo[momento];
       
-      if (!comidaMomento) continue; // Si no hay registro para este momento, saltar
+      if (!comidaMomento) continue; 
 
       const prompt = `
         Eres el coach de bienestar oficial de la app PrevIA.
@@ -126,7 +126,7 @@ const generarRecomendacionIA = async (req, res) => {
           mensajeRecomendacion = respuestaIA;
         }
 
-        // Guardar la recomendación
+        
         const nuevaRecomendacion = new RecomendacionIA({
           usuario_id: usuarioId,
           fecha_generacion: new Date(),

@@ -27,11 +27,11 @@ const registroBienestarSchema = new mongoose.Schema({
     max: 5
   }
 }, {
-  timestamps: true // Esto agrega automáticamente la fecha de creación y actualización
+  timestamps: true 
 });
 
-// Este es el candado lógico que replica el que creamos en Atlas:
-// Bloquea que el mismo usuario guarde dos registros el mismo día.
+
+
 registroBienestarSchema.index({ usuario_id: 1, fecha: 1 }, { unique: true });
 
 module.exports = mongoose.model('RegistroBienestar', registroBienestarSchema);

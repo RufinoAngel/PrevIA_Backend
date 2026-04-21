@@ -8,7 +8,7 @@ const historialRachasSchema = new mongoose.Schema({
     required: true
   },
   habito: {
-    type: String, // Ej: "Agua", "Sueño", "Ejercicio", "Bienestar"
+    type: String, 
     required: true
   },
   dias_consecutivos: {
@@ -25,7 +25,7 @@ const historialRachasSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Candado: Solo 1 registro por usuario y por hábito
+
 historialRachasSchema.index({ usuario_id: 1, habito: 1 }, { unique: true });
 
 module.exports = mongoose.model('HistorialRachas', historialRachasSchema);

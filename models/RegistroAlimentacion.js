@@ -12,22 +12,22 @@ const registroAlimentacionSchema = new mongoose.Schema({
     required: true
   },
   tipo_comida: {
-    type: String, // Ej: "Desayuno", "Comida Fuerte", "Cena", "Snack"
+    type: String, 
     required: true
   },
   descripcion_corta: {
-    type: [String], // Arreglo para listar los alimentos de forma objetiva y sencilla
+    type: [String], 
     required: true
   },
   hora_registro: {
-    type: String, // Formato "HH:mm"
+    type: String, 
     required: true
   }
 }, {
   timestamps: true
 });
 
-// Índice normal (SIN candado único) solo para que las búsquedas por fecha sean ultrarrápidas
+
 registroAlimentacionSchema.index({ usuario_id: 1, fecha: 1 });
 
 module.exports = mongoose.model('RegistroAlimentacion', registroAlimentacionSchema);
