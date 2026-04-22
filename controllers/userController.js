@@ -57,7 +57,7 @@ const olvidarPassword = async (req, res) => {
               Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en nuestra plataforma.
             </p>
             <p style="font-size: 16px; line-height: 1.6; color: #000000;">
-              Para recuperar tu acceso, haz clic en el siguiente botón. Por seguridad, <strong>este enlace expirará en 15 minutos</strong>.
+              Para recuperar tu acceso, haz clic en el siguiente botón. Por seguridad, <strong>este enlace expirará en 30 minutos</strong>.
             </p>
             <div style="text-align: center; margin: 35px 0;">
               <a href="${link}" style="background-color: #02746E; color: #FFFFFF; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; text-transform: uppercase; letter-spacing: 1px;">

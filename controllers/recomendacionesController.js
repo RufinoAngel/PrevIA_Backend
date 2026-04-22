@@ -3,25 +3,21 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const RecomendacionIA = require('../models/RecomendacionIA');
 const RegistroBienestar = require('../models/RegistroBienestar');
-const RegistroSueno = require('../models/RegistroSueno'); 
+const RegistroSueno = require('../models/RegistroSueno');
 const RegistroAlimentacion = require('../models/RegistroAlimentacion');
 const RegistroActividadFisica = require('../models/RegistroActividadFisica');
-const pool = require('../config/db'); 
+const pool = require('../config/db');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-
-
 const generarRecomendacionIA = async (req, res) => {
   try {
-    console.log('👉 ¡HOLA! El frontend sí me llamó para generar la IA');
     const usuarioId = req.usuario.id;
 
-    
     const [perfilDb] = await pool.query(
-      `SELECT p.nombre, m.meta_agua_vasos 
-       FROM perfiles p 
-       LEFT JOIN metas_configuracion m ON p.usuario_id = m.usuario_id 
+      `SELECT p.nombre, m.meta_agua_vasos
+       FROM perfiles p
+       LEFT JOIN metas_configuracion m ON p.usuario_id = m.usuario_id
        WHERE p.usuario_id = ?`,
       [usuarioId]
     );
@@ -29,23 +25,18 @@ const generarRecomendacionIA = async (req, res) => {
     const nombreUsuario = perfilDb.length > 0 && perfilDb[0].nombre ? perfilDb[0].nombre : 'Usuario';
     const metaAgua = perfilDb.length > 0 && perfilDb[0].meta_agua_vasos ? perfilDb[0].meta_agua_vasos : 8;
 
-    
     const inicioDia = new Date();
     inicioDia.setUTCHours(0, 0, 0, 0);
     const finDia = new Date();
     finDia.setUTCHours(23, 59, 59, 999);
-    
-    
+
     const recomendacionesExistentes = await RecomendacionIA.find({
       usuario_id: usuarioId,
       fecha_generacion: { $gte: inicioDia, $lte: finDia }
     });
 
-    if (recomendacionesExistentes.length > 0) {
-      return res.status(200).json({ datos: recomendacionesExistentes });
-    }
+    const momentosGenerados = recomendacionesExistentes.map(r => r.momento_dia.toLowerCase());
 
-    
     const [bienestarHoy, suenoHoy, alimentacionesHoy, actividadHoy] = await Promise.all([
       RegistroBienestar.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 }),
       RegistroSueno.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 }),
@@ -53,51 +44,47 @@ const generarRecomendacionIA = async (req, res) => {
       RegistroActividadFisica.findOne({ usuario_id: usuarioId, fecha: { $gte: inicioDia, $lte: finDia } }).sort({ fecha: -1 })
     ]);
 
-    
-    console.log(`[IA DEBUG] Registros encontrados -> Bienestar: ${!!bienestarHoy} | Sueño: ${!!suenoHoy} | Comidas: ${alimentacionesHoy.length} | Actividad: ${!!actividadHoy}`);
-
-    
     if (!bienestarHoy || !suenoHoy || alimentacionesHoy.length === 0 || !actividadHoy) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         registros_completos: false,
-        error: 'Para darte un consejo exacto, necesito que completes tus 4 registros de hoy (Agua/Ánimo, Sueño, Nutrición y Ejercicio).' 
+        error: 'Para darte un consejo exacto, necesito que completes tus 4 registros de hoy (Agua/Ánimo, Sueño, Nutrición y Ejercicio).'
       });
     }
 
-    
     const comidasPorTipo = {
-      Desayuno: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'desayuno'),
-      Comida: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'comida'),
-      Cena: alimentacionesHoy.find(c => c.tipo_comida.toLowerCase() === 'cena')
+      Desayuno: alimentacionesHoy.find(c => c.tipo_comida?.toLowerCase().includes('desayuno')),
+      Comida: alimentacionesHoy.find(c => c.tipo_comida?.toLowerCase().includes('comida') || c.tipo_comida?.toLowerCase().includes('almuerzo')),
+      Cena: alimentacionesHoy.find(c => c.tipo_comida?.toLowerCase().includes('cena'))
     };
 
-    
     const momentosDia = ['Desayuno', 'Comida', 'Cena'];
-    const recomendacionesGuardadas = [];
+    const recomendacionesGuardadas = [...recomendacionesExistentes];
 
     for (const momento of momentosDia) {
+      if (momentosGenerados.includes(momento.toLowerCase())) continue;
+
       const comidaMomento = comidasPorTipo[momento];
-      
-      if (!comidaMomento) continue; 
+
+      if (!comidaMomento) continue;
 
       const prompt = `
-        Eres el coach de bienestar oficial de la app PrevIA.
+        Eres el coach de bienestar oficial de la app prevIA.
         Tu usuario se llama ${nombreUsuario}.
-        
+
         El usuario acaba de registrar su ${momento.toLowerCase()} de hoy.
-        
+
         Análisis de este momento:
-        - ${momento}: "${comidaMomento.descripcion_corta || 'No especificado'}"
+        - ${momento}: "${comidaMomento?.descripcion_corta || 'No especificado'}"
         - Contexto general: Estrés ${bienestarHoy.nivel_estres || 3}/5, Ánimo "${bienestarHoy.estado_animo || 'Normal'}", Agua: ${bienestarHoy.vasos_agua_consumidos || 0}/${metaAgua} vasos.
         - Sueño anoche: ${suenoHoy.horas_dormidas || 0} horas (Calidad: ${suenoHoy.calidad || 3}/5).
         - Actividad física: ${actividadHoy.duracion_minutos || 0} minutos de ${actividadHoy.tipo_ejercicio || 'ejercicio'}.
-        
+
         Instrucciones:
         Dale un consejo específico para este ${momento.toLowerCase()} que considerando su estado general.
         - Si la comida es poco nutritiva, sugiere mejoras.
         - Si es buena opción, motívalo a mantenerlo.
         - Si puede complementar con algo (agua, proteína, etc.), recomiéndalo.
-        
+
         Responde ESTRICTAMENTE en formato JSON válido, sin comillas invertidas ni la palabra json, con esta estructura:
         {
           "tipo": "Recomendación",
@@ -106,11 +93,9 @@ const generarRecomendacionIA = async (req, res) => {
       `;
 
       try {
-        console.log(`[IA DEBUG] Generando recomendación para ${momento}...`);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
         const result = await model.generateContent(prompt);
         let respuestaIA = result.response.text();
-        console.log(`[IA DEBUG] Respuesta de Gemini para ${momento}:`, respuestaIA);
 
         respuestaIA = respuestaIA.replace(/```json/gi, '').replace(/```/g, '').trim();
 
@@ -122,11 +107,9 @@ const generarRecomendacionIA = async (req, res) => {
           tipoRecomendacion = dataProcesada.tipo || 'Sugerencia';
           mensajeRecomendacion = dataProcesada.mensaje || respuestaIA;
         } catch (e) {
-          console.warn(`Gemini no devolvió JSON para ${momento}. Usando texto plano.`);
           mensajeRecomendacion = respuestaIA;
         }
 
-        
         const nuevaRecomendacion = new RecomendacionIA({
           usuario_id: usuarioId,
           fecha_generacion: new Date(),
@@ -140,18 +123,18 @@ const generarRecomendacionIA = async (req, res) => {
         recomendacionesGuardadas.push(recomendacionGuardada);
 
       } catch (error) {
-        console.error(`Error generando recomendación para ${momento}:`, error);
+        console.error(`🚨 ERROR GENERANDO IA PARA ${momento}:`, error);
       }
     }
 
     res.status(201).json({
       registros_completos: true,
-      mensaje: 'PrevIA ha analizado tu día y tiene consejos para cada momento',
+      mensaje: 'prevIA ha actualizado tus consejos del día',
       datos: recomendacionesGuardadas
     });
 
   } catch (error) {
-    console.error('Error en generarRecomendacionIA:', error);
+    console.error("🚨 ERROR FATAL EN EL BACKEND:", error);
     res.status(500).json({ error: 'Error interno al conectar con la Inteligencia Artificial' });
   }
 };
@@ -162,7 +145,6 @@ const obtenerRecomendacionesUsuario = async (req, res) => {
     const recomendaciones = await RecomendacionIA.find({ usuario_id: usuarioId }).sort({ fecha_generacion: -1 });
     res.status(200).json(recomendaciones);
   } catch (error) {
-    console.error('Error:', error);
     res.status(500).json({ error: 'Error al obtener recomendaciones' });
   }
 };
@@ -171,16 +153,67 @@ const completarRecomendacion = async (req, res) => {
   try {
     const { id } = req.params;
     const usuarioId = req.usuario.id;
+
     const recomendacionActualizada = await RecomendacionIA.findOneAndUpdate(
       { _id: id, usuario_id: usuarioId },
       { estado_completado: true },
       { returnDocument: 'after' }
     );
-    if (!recomendacionActualizada) return res.status(404).json({ error: 'No encontrada' });
-    res.status(200).json({ mensaje: '¡Reto completado!', datos: recomendacionActualizada });
+
+    if (!recomendacionActualizada) {
+      return res.status(404).json({ error: 'No encontrada' });
+    }
+
+    const inicioDia = new Date();
+    inicioDia.setUTCHours(0, 0, 0, 0);
+    const finDia = new Date();
+    finDia.setUTCHours(23, 59, 59, 999);
+
+    const retosCompletadosHoy = await RecomendacionIA.countDocuments({
+      usuario_id: usuarioId,
+      fecha_generacion: { $gte: inicioDia, $lte: finDia },
+      estado_completado: true
+    });
+
+    let medallaGanada = null;
+
+    if (retosCompletadosHoy === 3) {
+      const [medallaExistente] = await pool.query(
+        `SELECT id_medalla FROM usuario_medallas 
+         WHERE usuario_id = ? 
+         AND nombre_medalla = 'Día Perfecto' 
+         AND DATE(fecha_obtenida) = CURDATE()`,
+        [usuarioId]
+      );
+
+      if (medallaExistente.length === 0) {
+        const nombreMedalla = 'Día Perfecto';
+        const descripcionMedalla = 'Completaste todos tus consejos de prevIA (Desayuno, Comida y Cena) en un solo día.';
+        const iconoUrl = '🌟'; 
+
+        const query = `
+          INSERT INTO usuario_medallas (usuario_id, nombre_medalla, descripcion_medalla, icono_url)
+          VALUES (?, ?, ?, ?)
+        `;
+        await pool.query(query, [usuarioId, nombreMedalla, descripcionMedalla, iconoUrl]);
+
+        medallaGanada = {
+          nombre: nombreMedalla,
+          descripcion: descripcionMedalla,
+          icono: iconoUrl
+        };
+      }
+    }
+
+    res.status(200).json({ 
+      mensaje: medallaGanada ? '¡Día Perfecto completado!' : '¡Reto completado!', 
+      datos: recomendacionActualizada,
+      medalla: medallaGanada
+    });
+
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Error al actualizar' });
+    console.error("🚨 ERROR AL COMPLETAR RETO O DAR MEDALLA:", error);
+    res.status(500).json({ error: 'Error al actualizar tu progreso' });
   }
 };
 

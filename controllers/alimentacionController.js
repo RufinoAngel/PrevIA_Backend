@@ -4,10 +4,15 @@ const RegistroAlimentacion = require('../models/RegistroAlimentacion');
 const crearRegistroAlimentacion = async (req, res) => {
   try {
     const usuarioId = req.usuario.id;
-    const { fecha, tipoComida, descripcionCorta, horaRegistro } = req.body;
+    let { fecha, tipoComida, descripcionCorta, horaRegistro } = req.body;
 
     if (!fecha || !tipoComida || !descripcionCorta || !horaRegistro) {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+    }
+
+    // Normalizar tipoComida: "Almuerzo / Comida" -> "Comida"
+    if (tipoComida.toLowerCase().includes('almuerzo')) {
+      tipoComida = 'Comida';
     }
 
     const fechaNormalizada = new Date(fecha);
@@ -66,8 +71,13 @@ const obtenerAlimentacionPorFecha = async (req, res) => {
 const actualizarRegistroAlimentacion = async (req, res) => {
   try {
     const { id } = req.params;
-    const { tipoComida, descripcionCorta, horaRegistro } = req.body;
+    let { tipoComida, descripcionCorta, horaRegistro } = req.body;
     const usuarioId = req.usuario.id;
+
+    // Normalizar tipoComida: "Almuerzo / Comida" -> "Comida"
+    if (tipoComida.toLowerCase().includes('almuerzo')) {
+      tipoComida = 'Comida';
+    }
 
     const registroActualizado = await RegistroAlimentacion.findOneAndUpdate(
       { _id: id, usuario_id: usuarioId }, 
